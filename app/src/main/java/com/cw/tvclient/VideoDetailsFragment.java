@@ -197,10 +197,13 @@ public class VideoDetailsFragment extends DetailsFragment {
 		String subcategories[] = {getString(R.string.related_movies)};
 		List<Movie> list = MovieList.getList();
 
-		Collections.shuffle(list);
+//		Collections.shuffle(list);
 		ArrayObjectAdapter listRowAdapter = new ArrayObjectAdapter(new CardPresenter());
-		for (int j = 0; j < NUM_COLS; j++) {
-			listRowAdapter.add(list.get(j % 5));
+//		for (int j = 0; j < NUM_COLS; j++)
+		for (int j = 0; j < list.size(); j++)
+			{
+//			listRowAdapter.add(list.get(j % 5));
+			listRowAdapter.add(list.get(j));
 		}
 
 		HeaderItem header = new HeaderItem(0, subcategories[0]);

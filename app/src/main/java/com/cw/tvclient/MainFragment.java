@@ -38,14 +38,8 @@ import android.support.v4.content.ContextCompat;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.BaseAdapter;
-import android.widget.ImageView;
-import android.widget.ListView;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -54,30 +48,11 @@ import com.bumptech.glide.load.resource.drawable.GlideDrawable;
 import com.bumptech.glide.request.animation.GlideAnimation;
 import com.bumptech.glide.request.target.SimpleTarget;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.URL;
-import java.security.SecureRandom;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
-import java.util.Collections;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-///
-import org.json.JSONArray;
-import org.json.JSONObject;
-import com.google.android.youtube.player.YouTubeIntents;
-
-import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSession;
-import javax.net.ssl.X509TrustManager;
-///
 
 public class MainFragment extends BrowseFragment {
 	private static final String TAG = "MainFragment";
@@ -85,7 +60,7 @@ public class MainFragment extends BrowseFragment {
 	private static final int BACKGROUND_UPDATE_DELAY = 300;
 	private static final int GRID_ITEM_WIDTH = 200;
 	private static final int GRID_ITEM_HEIGHT = 200;
-	private static final int NUM_ROWS = 6;
+	private static final int NUM_ROWS = 3;// 6;
 	private static final int NUM_COLS = 15;
 
 	private final Handler mHandler = new Handler();
@@ -104,9 +79,47 @@ public class MainFragment extends BrowseFragment {
 
 		setupUIElements();
 
-		loadRows();
+		CheckHTTPS check = new CheckHTTPS();
+		check.execute();
+	}
 
-		setupEventListeners();
+
+	class CheckHTTPS extends AsyncTask<Void,Void,Void>
+	{
+		int code = -1;
+
+		@Override
+		protected Void doInBackground(Void... voids) {
+			// HTTPS POST
+			String project = "LiteNote";
+			String urlStr =  "https://" + project + ".ddns.net:8443/"+ project +"Web/viewNote/viewNote_json.jsp";
+
+			URL url = null;
+			try {
+				url = new URL(urlStr);
+				MovieList.trustEveryone();
+				HttpsURLConnection connection = ((HttpsURLConnection) url.openConnection());
+				connection.connect();
+				code = connection.getResponseCode();
+				connection.disconnect();
+			}catch (Exception e)
+			{
+				e.printStackTrace();
+			}
+			return null;
+		}
+
+		@Override
+		protected void onPostExecute(Void aVoid) {
+			super.onPostExecute(aVoid);
+			if (code == 200) {
+				// reachable
+				loadRows();
+				setupEventListeners();
+			} else {
+				Toast.makeText(getActivity(),"Network connection failed.",Toast.LENGTH_SHORT).show();
+			}
+		}
 	}
 
 	@Override
@@ -120,40 +133,45 @@ public class MainFragment extends BrowseFragment {
 
 	private void loadRows() {
 
-		MovieList.prepareList();
-
-		while (!MovieList.isDataReady)
-		{
-			System.out.println("MainFragment / waiting ...");
-			try {
-				Thread.sleep(1000);
-			}catch (Exception e)
-			{
-				e.printStackTrace();
-			}
-		}
-
-		List<Movie> list = MovieList.setupMovies();
 
 		ArrayObjectAdapter rowsAdapter = new ArrayObjectAdapter(new ListRowPresenter());
 		CardPresenter cardPresenter = new CardPresenter();
 
-		int i;
-		for (i = 0; i < NUM_ROWS; i++) {
-			if (i != 0) {
-				Collections.shuffle(list);
+		int row;
+		for (row = 0; row < NUM_ROWS; row++) {
+
+			// prepare
+			MovieList.isDataReady = false;
+			MovieList.prepareList(row+1);//table name starts from 1
+			while (!MovieList.isDataReady)
+			{
+				System.out.println("MainFragment / waiting ...");
+				try {
+					Thread.sleep(1000);
+				}catch (Exception e)
+				{
+					e.printStackTrace();
+				}
 			}
+
+			// setup list
+			List<Movie> list = MovieList.setupMovies();
+
+			//			if (row != 0) {
+//				Collections.shuffle(list);
+//			}
 			ArrayObjectAdapter listRowAdapter = new ArrayObjectAdapter(cardPresenter);
 //			for (int j = 0; j < NUM_COLS; j++) {
-				for (int j = 0; j < list.size(); j++) {
-//					listRowAdapter.add(list.get(j % 5));
-					listRowAdapter.add(list.get(j));
+
+			for (int col = 0; col < list.size(); col++) {
+					listRowAdapter.add(list.get(col));
 			}
-			HeaderItem header = new HeaderItem(i, MovieList.MOVIE_CATEGORY[i]);
+
+			HeaderItem header = new HeaderItem(row, MovieList.MOVIE_CATEGORY[row]);
 			rowsAdapter.add(new ListRow(header, listRowAdapter));
 		}
 
-		HeaderItem gridHeader = new HeaderItem(i, "PREFERENCES");
+		HeaderItem gridHeader = new HeaderItem(row, "PREFERENCES");
 
 		GridItemPresenter mGridPresenter = new GridItemPresenter();
 		ArrayObjectAdapter gridRowAdapter = new ArrayObjectAdapter(mGridPresenter);

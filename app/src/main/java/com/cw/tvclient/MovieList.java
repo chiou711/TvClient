@@ -20,9 +20,11 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.DataOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -79,8 +81,8 @@ public final class MovieList {
 				+ "facilisis mattis. Ut aliquet luctus lacus. Phasellus nec commodo erat. Praesent tempus id "
 				+ "lectus ac scelerisque. Maecenas pretium cursus lectus id volutpat.";
 
-		String studio[] = new String[Id.length];
-		for(int i=0;i< Id.length;i++)
+		String studio[] = new String[Title.length];
+		for(int i=0;i< Title.length;i++)
 			studio[i] = String.valueOf(i);
 
 //		String studio[] = {
@@ -96,8 +98,8 @@ public final class MovieList {
 //				"http://commondatastorage.googleapis.com/android-tv/Sample%20videos/April%20Fool's%202013/Introducing%20Google%20Nose.mp4"
 //		};
 
-		String bgImageUrl[] = new String[Id.length];
-		for(int i=0;i< Id.length;i++)
+		String bgImageUrl[] = new String[Title.length];
+		for(int i=0;i< Title.length;i++)
 			bgImageUrl[i] =  "http://img.youtube.com/vi/"+getYoutubeId(Uri[i])+"/0.jpg";
 //		String bgImageUrl[] = {
 //				"http://commondatastorage.googleapis.com/android-tv/Sample%20videos/Zeitgeist/Zeitgeist%202010_%20Year%20in%20Review/bg.jpg",
@@ -107,8 +109,8 @@ public final class MovieList {
 //				"http://commondatastorage.googleapis.com/android-tv/Sample%20videos/April%20Fool's%202013/Introducing%20Google%20Nose/bg.jpg",
 //		};
 
-		String cardImageUrl[] = new String[Id.length];
-		for(int i=0;i< Id.length;i++)
+		String cardImageUrl[] = new String[Title.length];
+		for(int i=0;i< Title.length;i++)
 			cardImageUrl[i] =  "http://img.youtube.com/vi/"+getYoutubeId(Uri[i])+"/0.jpg";
 
 //		String cardImageUrl[] = {
@@ -134,6 +136,11 @@ public final class MovieList {
 							cardImageUrl[index],
 							bgImageUrl[index]));
 		}
+
+		// clear
+		Id = null;
+		Uri = null;
+		Title = null;
 
 		return list;
 	}
@@ -163,24 +170,32 @@ public final class MovieList {
 	static String [] Title;
 	static boolean isDataReady;
 
-	static void prepareList()
+	static void prepareList(int pageNum)
 	{
-		MyTask task = new MyTask();
+		MyTask task = new MyTask(pageNum);
 		task.execute();
 	}
 
 	private static class MyTask extends AsyncTask<Void,Void,Void> {
+		int pageNum;
+		MyTask(int num){pageNum = num; }
+
+
 		@Override
 		protected Void doInBackground(Void... voids) {
-			System.out.println("MainActivity / MyTask /_doInBackground");
+			System.out.println("MainActivity / MyTask /_doInBackground / pageNum = " + pageNum);
 
 			String strResult = "";
-			isDataReady = false;
 
 			// HTTPS POST
-			String project = "Project";
+			String project = "LiteNote";
 			String urlStr =  "https://" + project + ".ddns.net:8443/"+ project +"Web/viewNote/viewNote_json.jsp";
 			//refer https://stackoverflow.com/questions/16504527/how-to-do-an-https-post-from-android
+			//refer https://stackoverflow.com/questions/4205980/java-sending-http-parameters-via-post-method-easily/20991252
+			String urlParameters  = "PageNumber="+pageNum;
+			byte[] postData       = urlParameters.getBytes( StandardCharsets.UTF_8 );
+			int    postDataLength = postData.length;
+
 			try {
 				URL url = new URL(urlStr);
 				trustEveryone();
@@ -191,6 +206,17 @@ public final class MovieList {
 				urlConnection.setConnectTimeout(7000);
 				urlConnection.setRequestMethod("POST");
 				urlConnection.setDoInput(true);
+				urlConnection.setDoOutput( true );
+				urlConnection.setInstanceFollowRedirects( false );
+				urlConnection.setRequestProperty( "Content-Type", "application/x-www-form-urlencoded");
+				urlConnection.setRequestProperty( "charset", "utf-8");
+				urlConnection.setRequestProperty( "Content-Length", Integer.toString( postDataLength ));
+				urlConnection.setUseCaches( false );
+				try( DataOutputStream wr = new DataOutputStream( urlConnection.getOutputStream())) {
+					wr.write( postData );
+					wr.close();
+					wr.flush();
+				}
 
 				// Add any data you wish to post here
 				urlConnection.connect();
@@ -239,11 +265,10 @@ public final class MovieList {
 		@Override
 		protected void onPostExecute(Void Result){
 			super.onPostExecute(Result);
-//			isDataReady = true;
 		}
 	}
 
-	private static void trustEveryone() {
+	static void trustEveryone() {
 		try {
 			HttpsURLConnection.setDefaultHostnameVerifier(new HostnameVerifier(){
 				public boolean verify(String hostname, SSLSession session) {
