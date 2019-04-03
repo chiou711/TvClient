@@ -40,14 +40,14 @@ import javax.net.ssl.SSLSession;
 import javax.net.ssl.X509TrustManager;
 
 public final class MovieList {
-	public static final String MOVIE_CATEGORY[] = {
-			"Category Zero",
-			"Category One",
-			"Category Two",
-			"Category Three",
-			"Category Four",
-			"Category Five",
-	};
+//	public static final String MOVIE_CATEGORY[] = {
+//			"Category Zero",
+//			"Category One",
+//			"Category Two",
+//			"Category Three",
+//			"Category Four",
+//			"Category Five",
+//	};
 
 	static List<Movie> list;
 	private static long count = 0;
@@ -60,8 +60,6 @@ public final class MovieList {
 	}
 
 	public static List<Movie> setupMovies() {
-
-//		prepareList();
 
 		list = new ArrayList<>();
 
@@ -163,8 +161,6 @@ public final class MovieList {
 		return movie;
 	}
 
-
-	///
 	static int [] Id;
 	static String [] Uri;
 	static String [] Title;
@@ -172,26 +168,25 @@ public final class MovieList {
 
 	static void prepareList(int pageNum)
 	{
-		MyTask task = new MyTask(pageNum);
+		GetListTask task = new GetListTask(pageNum);
 		task.execute();
 	}
 
-	private static class MyTask extends AsyncTask<Void,Void,Void> {
+	private static class GetListTask extends AsyncTask<Void,Void,Void> {
 		int pageNum;
-		MyTask(int num){pageNum = num; }
-
+		GetListTask(int num){pageNum = num; }
 
 		@Override
 		protected Void doInBackground(Void... voids) {
-			System.out.println("MainActivity / MyTask /_doInBackground / pageNum = " + pageNum);
+			System.out.println("MainActivity / GetListTask /_doInBackground / pageNum = " + pageNum);
 
 			String strResult = "";
 
-			// HTTPS POST
-			String project = "LiteNote";
-			String urlStr =  "https://" + project + ".ddns.net:8443/"+ project +"Web/viewNote/viewNote_json.jsp";
 			//refer https://stackoverflow.com/questions/16504527/how-to-do-an-https-post-from-android
 			//refer https://stackoverflow.com/questions/4205980/java-sending-http-parameters-via-post-method-easily/20991252
+			// HTTPS POST
+			String project = "LiteNote";
+			String urlStr =  "https://" + project + ".ddns.net:8443/"+ project +"Web/client/viewNote_json.jsp";
 			String urlParameters  = "PageNumber="+pageNum;
 			byte[] postData       = urlParameters.getBytes( StandardCharsets.UTF_8 );
 			int    postDataLength = postData.length;
@@ -320,6 +315,5 @@ public final class MovieList {
 		}
 		return videoId;
 	}
-	///
 
 }
