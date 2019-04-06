@@ -89,12 +89,6 @@ public class MainFragment extends BrowseFragment {
 
 		setupUIElements();
 
-		// check server connection
-		CheckHttpsConnection checkConnTask = new CheckHttpsConnection();
-		checkConnTask.execute();
-		while(!checkConnTask.checkIsReady)
-			SystemClock.sleep(1000);
-
 		// get total rows from server
 		GetRowsTask getRowsTask = new GetRowsTask();
 		getRowsTask.execute();
@@ -106,44 +100,6 @@ public class MainFragment extends BrowseFragment {
 		setupEventListeners();
 	}
 
-
-	class CheckHttpsConnection extends AsyncTask<Void,Integer,Void>
-	{
-		int code = -1;
-		boolean checkIsReady;
-
-		@Override
-		protected Void doInBackground(Void... voids) {
-			checkIsReady = false;
-			// HTTPS POST
-			String project = "LiteNote";
-			String urlStr =  "https://" + project + ".ddns.net:8443/"+ project +"Web/client/viewNote_json.jsp";
-
-			try {
-				URL url = new URL(urlStr);
-				MovieList.trustEveryone();
-				HttpsURLConnection connection = ((HttpsURLConnection) url.openConnection());
-				connection.connect();
-				code = connection.getResponseCode();
-				if (code == 200) {
-					// reachable
-					checkIsReady = true;
-				} else {
-					Toast.makeText(getActivity(),"Network connection failed.",Toast.LENGTH_SHORT).show();
-				}
-				connection.disconnect();
-			}catch (Exception e)
-			{
-				e.printStackTrace();
-			}
-			return null;
-		}
-
-		@Override
-		protected void onPostExecute(Void aVoid) {
-			super.onPostExecute(aVoid);
-		}
-	}
 
 	@Override
 	public void onDestroy() {
