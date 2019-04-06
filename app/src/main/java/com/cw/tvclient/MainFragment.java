@@ -20,6 +20,7 @@ import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.SystemClock;
 import android.support.v17.leanback.app.BackgroundManager;
 import android.support.v17.leanback.app.BrowseFragment;
 import android.support.v17.leanback.widget.ArrayObjectAdapter;
@@ -80,6 +81,7 @@ public class MainFragment extends BrowseFragment {
 
 	@Override
 	public void onActivityCreated(Bundle savedInstanceState) {
+		System.out.println("MainFragment / _onActivityCreated");
 		Log.i(TAG, "onCreate");
 		super.onActivityCreated(savedInstanceState);
 
@@ -87,32 +89,29 @@ public class MainFragment extends BrowseFragment {
 
 		setupUIElements();
 
-		// check connection
-		CheckHttpsConnection check = new CheckHttpsConnection();
-		check.execute();
-		while(!check.checkIsReady)
-		{
-			try {
-				Thread.sleep(1000);
-				System.out.println("waiting");
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-		}
+		// check server connection
+		CheckHttpsConnection checkConnTask = new CheckHttpsConnection();
+		checkConnTask.execute();
+		while(!checkConnTask.checkIsReady)
+			SystemClock.sleep(1000);
 
-		// get pages
-		rowsCount = getRowsCount();
+		// get total rows from server
+		GetRowsTask getRowsTask = new GetRowsTask();
+		getRowsTask.execute();
+		while (!getRowsTask.isGetReady)
+				SystemClock.sleep(1000);
+		rowsCount = getRowsTask.count;
 
 		loadRows();
 		setupEventListeners();
 	}
 
 
-
-	class CheckHttpsConnection extends AsyncTask<Void,Void,Void>
+	class CheckHttpsConnection extends AsyncTask<Void,Integer,Void>
 	{
 		int code = -1;
 		boolean checkIsReady;
+
 		@Override
 		protected Void doInBackground(Void... voids) {
 			checkIsReady = false;
@@ -139,6 +138,11 @@ public class MainFragment extends BrowseFragment {
 			}
 			return null;
 		}
+
+		@Override
+		protected void onPostExecute(Void aVoid) {
+			super.onPostExecute(aVoid);
+		}
 	}
 
 	@Override
@@ -150,107 +154,10 @@ public class MainFragment extends BrowseFragment {
 		}
 	}
 
-	int getRowsCount()
-	{
-		GetRowsTask task = new GetRowsTask();
-		task.execute();
-		while (!task.isGetReady)
-		{
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-		}
-		return task.count;
-	}
-
-
-	private static class GetRowsTask extends AsyncTask<Void,Void,Void> {
-		boolean isGetReady;
-		int count;
-		GetRowsTask(){ }
-
-		@Override
-		protected Void doInBackground(Void... voids) {
-			System.out.println("MainFragment / GetRowsTask /_doInBackground");
-			isGetReady = false;
-			String strResult = "";
-
-			// HTTPS POST
-			String project = "LiteNote";
-			String urlStr =  "https://" + project + ".ddns.net:8443/"+ project +"Web/client/viewTotalPages.jsp";
-
-			try {
-				URL url = new URL(urlStr);
-				MovieList.trustEveryone();
-				HttpsURLConnection urlConnection = ((HttpsURLConnection)url.openConnection());
-
-				// set Timeout and method
-				urlConnection.setReadTimeout(7000);
-				urlConnection.setConnectTimeout(7000);
-				urlConnection.setRequestMethod("POST");
-				urlConnection.setDoInput(true);
-				urlConnection.setDoOutput( true );
-				urlConnection.setInstanceFollowRedirects( false );
-				urlConnection.setRequestProperty( "Content-Type", "application/x-www-form-urlencoded");
-				urlConnection.setRequestProperty( "charset", "utf-8");
-				urlConnection.setUseCaches( false );
-				try( DataOutputStream wr = new DataOutputStream( urlConnection.getOutputStream())) {
-					wr.close();
-					wr.flush();
-				}
-
-				// Add any data you wish to post here
-				urlConnection.connect();
-				InputStream in = urlConnection.getInputStream();
-
-				if(in != null) {
-					BufferedReader br = new BufferedReader(new InputStreamReader(in));
-					String inputLine;
-
-					while ((inputLine = br.readLine()) != null) {
-						System.out.println("MainFragment / GetRowsTask / inputLine = " + inputLine);
-						strResult += inputLine;
-					}
-				}
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-
-			System.out.println("MainFragment / GetRowsTask / result final = " + strResult);
-
-			// JSON array
-			try {
-				JSONArray jsonArray = new JSONArray(strResult);
-				for (int i = 0; i < jsonArray.length(); i++)
-				{
-					JSONObject jsonObject = (JSONObject) jsonArray.get(i);
-					count = jsonObject.getInt("totalPagesCount");
-				}
-				isGetReady = true;
-			}
-			catch (Exception e)
-			{
-				e.printStackTrace();
-			}
-
-			return null;
-		}
-		@Override
-		protected void onPostExecute(Void Result){
-			super.onPostExecute(Result);
-
-		}
-	}
-
-
-
 	private void loadRows() {
 
 		ArrayObjectAdapter rowsAdapter = new ArrayObjectAdapter(new ListRowPresenter());
 		CardPresenter cardPresenter = new CardPresenter();
-
 
 		int row;
 //		for (row = 0; row < NUM_ROWS; row++) {
@@ -262,12 +169,7 @@ public class MainFragment extends BrowseFragment {
 			while (!MovieList.isDataReady)
 			{
 				System.out.println("MainFragment / waiting ...");
-				try {
-					Thread.sleep(1000);
-				}catch (Exception e)
-				{
-					e.printStackTrace();
-				}
+				SystemClock.sleep(1000);
 			}
 
 			// setup list
@@ -284,7 +186,7 @@ public class MainFragment extends BrowseFragment {
 			}
 
 //			HeaderItem header = new HeaderItem(row, MovieList.MOVIE_CATEGORY[row]);
-			HeaderItem header = new HeaderItem(row, "Set "+(row+1));
+			HeaderItem header = new HeaderItem(row, "合集 "+(row+1));
 			rowsAdapter.add(new ListRow(header, listRowAdapter));
 		}
 
@@ -295,6 +197,10 @@ public class MainFragment extends BrowseFragment {
 		gridRowAdapter.add(getResources().getString(R.string.grid_view));
 		gridRowAdapter.add(getString(R.string.error_fragment));
 		gridRowAdapter.add(getResources().getString(R.string.personal_settings));
+		///
+		String GRID_STRING_SPINNER = "Spinner";
+		gridRowAdapter.add(GRID_STRING_SPINNER);
+		///
 		rowsAdapter.add(new ListRow(gridHeader, gridRowAdapter));
 
 		setAdapter(rowsAdapter);
@@ -372,6 +278,7 @@ public class MainFragment extends BrowseFragment {
 			if (item instanceof Movie) {
 				Movie movie = (Movie) item;
 				Log.d(TAG, "Item: " + item.toString());
+
 //				Intent intent = new Intent(getActivity(), DetailsActivity.class);
 //				intent.putExtra(DetailsActivity.MOVIE, movie);
 //				Bundle bundle = ActivityOptionsCompat.makeSceneTransitionAnimation(
@@ -382,14 +289,27 @@ public class MainFragment extends BrowseFragment {
 //				getActivity().startActivity(intent, bundle);
 
 				String idStr = getYoutubeId(movie.getVideoUrl() );
-				Intent intent = YouTubeIntents.createPlayVideoIntentWithOptions(getActivity(), idStr, false/*fullscreen*/, true/*finishOnEnd*/);
+
+				Intent intent = YouTubeIntents.createPlayVideoIntentWithOptions(getActivity(), idStr, true/*fullscreen*/, true/*finishOnEnd*/);
 				startActivity(intent);
+
+//				Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("vnd.youtube://" + idStr));
+//				intent.putExtra("force_fullscreen",true);
+//				intent.putExtra("finish_on_ended",true);
+//				startActivity(intent);
 
 			} else if (item instanceof String) {
 				if (((String) item).contains(getString(R.string.error_fragment))) {
 					Intent intent = new Intent(getActivity(), BrowseErrorActivity.class);
 					startActivity(intent);
-				} else {
+				}
+				///
+				else if (item == "Spinner") {
+					// Show Spinner_fragment, while doing some is executed.
+					new GetRowsTask().execute();
+				}
+				///
+				else {
 					Toast.makeText(getActivity(), ((String) item), Toast.LENGTH_SHORT).show();
 				}
 			}
@@ -444,6 +364,91 @@ public class MainFragment extends BrowseFragment {
 
 		@Override
 		public void onUnbindViewHolder(ViewHolder viewHolder) {
+		}
+	}
+
+	private class GetRowsTask extends AsyncTask<Void, Void, Void> {
+		BrowseErrorActivity.SpinnerFragment mSpinnerFragment;
+		boolean isGetReady;
+		int count;
+
+		@Override
+		protected void onPreExecute() {
+			mSpinnerFragment = new BrowseErrorActivity.SpinnerFragment();
+			getFragmentManager().beginTransaction().add(R.id.main_browse_fragment, mSpinnerFragment).commit();
+		}
+
+		@Override
+		protected Void doInBackground(Void... params) {
+			// Do some background process here.
+			// It just waits 5 sec in this Tutorial
+			//SystemClock.sleep(5000);
+
+			String strResult = "";
+
+			// HTTPS POST
+			String project = "LiteNote";
+			String urlStr =  "https://" + project + ".ddns.net:8443/"+ project +"Web/client/viewTotalPages.jsp";
+
+			try {
+				URL url = new URL(urlStr);
+				MovieList.trustEveryone();
+				HttpsURLConnection urlConnection = ((HttpsURLConnection)url.openConnection());
+
+				// set Timeout and method
+				urlConnection.setReadTimeout(7000);
+				urlConnection.setConnectTimeout(7000);
+				urlConnection.setRequestMethod("POST");
+				urlConnection.setDoInput(true);
+				urlConnection.setDoOutput( true );
+				urlConnection.setInstanceFollowRedirects( false );
+				urlConnection.setRequestProperty( "Content-Type", "application/x-www-form-urlencoded");
+				urlConnection.setRequestProperty( "charset", "utf-8");
+				urlConnection.setUseCaches( false );
+				try( DataOutputStream wr = new DataOutputStream( urlConnection.getOutputStream())) {
+					wr.close();
+					wr.flush();
+				}
+
+				// Add any data you wish to post here
+				urlConnection.connect();
+				InputStream in = urlConnection.getInputStream();
+
+				if(in != null) {
+					BufferedReader br = new BufferedReader(new InputStreamReader(in));
+					String inputLine;
+
+					while ((inputLine = br.readLine()) != null) {
+						System.out.println("MainFragment / GetRowsTask / inputLine = " + inputLine);
+						strResult += inputLine;
+					}
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+
+			System.out.println("MainFragment / GetRowsTask / result final = " + strResult);
+
+			// JSON array
+			try {
+				JSONArray jsonArray = new JSONArray(strResult);
+				for (int i = 0; i < jsonArray.length(); i++)
+				{
+					JSONObject jsonObject = (JSONObject) jsonArray.get(i);
+					count = jsonObject.getInt("totalPagesCount");
+				}
+				isGetReady = true;
+			}
+			catch (Exception e)
+			{
+				e.printStackTrace();
+			}
+			return null;
+		}
+
+		@Override
+		protected void onPostExecute(Void aVoid) {
+			getFragmentManager().beginTransaction().remove(mSpinnerFragment).commit();
 		}
 	}
 
